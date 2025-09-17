@@ -1,0 +1,79 @@
+<div class="expense-form-container">
+    <h2>{{ isEditing ? 'Modificar Gasto' : 'Nuevo Gasto' }}</h2>
+
+    <form [formGroup]="expenseForm" (ngSubmit)="onSubmit()" class="expense-form">
+        <div class="form-group">
+            <label for="nombre">Nombre *</label>
+            <input type="text" id="nombre" formControlName="nombre" placeholder="Ingrese el nombre del gasto"
+                [class.error]="isFieldInvalid('nombre')" />
+            @if (isFieldInvalid('nombre')) {
+            <div class="error-message">
+                @if (expenseForm.get('nombre')?.errors?.['required']) {
+                <span>El nombre es obligatorio</span>
+                }
+                @if (expenseForm.get('nombre')?.errors?.['minlength']) {
+                <span>El nombre debe tener al menos 2 caracteres</span>
+                }
+            </div>
+            }
+        </div>
+
+        <div class="form-group">
+            <label for="categoria">Categoría *</label>
+            <select id="categoria" formControlName="categoria" [class.error]="isFieldInvalid('categoria')">
+                <option value="">Seleccione una categoría</option>
+                @for (categoria of categorias; track categoria) {
+                <option [value]="categoria">{{ categoria }}</option>
+                }
+            </select>
+            @if (isFieldInvalid('categoria')) {
+            <div class="error-message">
+                @if (expenseForm.get('categoria')?.errors?.['required']) {
+                <span>La categoría es obligatoria</span>
+                }
+            </div>
+            }
+        </div>
+
+        <div class="form-group checkbox-group">
+            <label for="fijo">
+                <input type="checkbox" id="fijo" formControlName="fijo" />
+                <span class="checkbox-label">¿Es un gasto fijo?</span>
+            </label>
+        </div>
+
+        <div class="form-group">
+            <label for="monto">Monto *</label>
+            <input type="number" id="monto" formControlName="monto" placeholder="0.00" step="0.01" min="0"
+                [class.error]="isFieldInvalid('monto')" />
+            @if (isFieldInvalid('monto')) {
+            <div class="error-message">
+                @if (expenseForm.get('monto')?.errors?.['required']) {
+                <span>El monto es obligatorio</span>
+                }
+                @if (expenseForm.get('monto')?.errors?.['min']) {
+                <span>El monto debe ser mayor a 0</span>
+                }
+            </div>
+            }
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary" [disabled]="!expenseForm.valid">
+                Guardar
+            </button>
+
+            @if (isEditing) {
+            <button type="button" class="btn btn-secondary" (click)="onCancel()">
+                Cancelar
+            </button>
+            }
+
+            @if (!isEditing) {
+            <button type="button" class="btn btn-secondary" (click)="onReset()">
+                Resetear
+            </button>
+            }
+        </div>
+    </form>
+</div>
