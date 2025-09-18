@@ -27,20 +27,9 @@ Esta guía te muestra cómo migrar una aplicación de gestión de gastos en Angu
 2. Registra tu app con el nombre: `mi-app-gastos-web`
 3. **NO** marques "Firebase Hosting" por ahora
 4. Haz clic en **"Registrar app"**
-5. **Copia las credenciales** que aparecen (las necesitarás después)
+5. **Copia y guarda las credenciales** que aparecen (las usarás en el Paso 6)
 
-```javascript
-// Ejemplo de credenciales (usa las tuyas reales)
-const firebaseConfig = {
-  apiKey: "YOUR_FIREBASE_API_KEY",
-  authDomain: "mi-proyecto.firebaseapp.com",
-  projectId: "mi-proyecto",
-  storageBucket: "mi-proyecto.appspot.com",
-  messagingSenderId: "123456789",
-  appId: "1:123456789:web:abcdef123456",
-  measurementId: "G-ABCD123456"
-};
-```
+> 💡 **Importante**: Guarda estas credenciales en un lugar seguro, las necesitarás para configurar Angular.
 
 ### Paso 4: Configurar Reglas de Firestore
 1. Ve a **"Firestore Database"** → **"Reglas"**
@@ -153,7 +142,28 @@ export const CATEGORIAS_GASTOS = [
 export type CategoriaGasto = typeof CATEGORIAS_GASTOS[number];
 ```
 
-### Paso 8: Migrar el Servicio de localStorage a Firestore
+### Paso 8: Importaciones de Firebase para Firestore
+
+**Funciones y tipos necesarios de `@angular/fire/firestore`:**
+
+```typescript
+import { 
+  Firestore,       // Instancia principal de la base de datos Firestore
+  collection,      // Crea referencia a una colección de documentos
+  doc,            // Crea referencia a un documento específico por ID
+  addDoc,         // Agrega un nuevo documento con ID auto-generado
+  updateDoc,      // Actualiza campos específicos de un documento existente
+  deleteDoc,      // Elimina permanentemente un documento
+  query,          // Crea consultas con filtros y ordenamiento
+  orderBy,        // Ordena resultados por un campo específico
+  Timestamp,      // Tipo de datos para fechas/horas de Firebase
+  onSnapshot,     // Escucha cambios en tiempo real en documentos/colecciones
+  QuerySnapshot,  // Tipo para el resultado de consultas con múltiples documentos
+  DocumentData    // Tipo genérico para datos de documentos de Firestore
+} from '@angular/fire/firestore';
+```
+
+### Paso 9: Migrar el Servicio de localStorage a Firestore
 
 **Archivo: `src/app/services/expense.service.ts`**
 
@@ -192,18 +202,9 @@ export class ExpenseService {
 import { Injectable, signal } from '@angular/core';
 import { BehaviorSubject } from 'rxjs';
 import { 
-  Firestore, 
-  collection, 
-  doc, 
-  addDoc, 
-  updateDoc, 
-  deleteDoc, 
-  query, 
-  orderBy,
-  Timestamp,
-  onSnapshot,
-  QuerySnapshot,
-  DocumentData
+  // Importaciones de Firebase (ver sección anterior)
+  Firestore, collection, doc, addDoc, updateDoc, deleteDoc, 
+  query, orderBy, Timestamp, onSnapshot, QuerySnapshot, DocumentData
 } from '@angular/fire/firestore';
 import { Expense, ExpenseForm, ExpenseData } from '../models/expense.model';
 
@@ -214,199 +215,15 @@ export class ExpenseService {
   private readonly COLLECTION_NAME = 'expenses'; // Nombre de la colección en Firestore
   private expensesSubject = new BehaviorSubject<Expense[]>([]);
   public readonly expenses = signal<Expense[]>([]);
-  public readonly expenses$ = this.expensesSubject.asObservable();
 
   constructor(private firestore: Firestore) {
     this.setupRealtimeListener(); // Escuchar cambios en tiempo real
   }
 
-  /**
-   * 🔥 NUEVO: Configurar escuchador en tiempo real
-   */
-  private setupRealtimeListener(): void {
-    try {
-      const expensesCollection = collection(this.firestore, this.COLLECTION_NAME);
-      const q = query(expensesCollection, orderBy('fechaCreacion', 'desc'));
-      
-      onSnapshot(q, (snapshot: QuerySnapshot<DocumentData>) => {
-        const expenses: Expense[] = [];
-        snapshot.forEach((doc) => {
-          const data = doc.data() as ExpenseData;
-          expenses.push({
-            id: doc.id,
-            ...data,
-            fechaCreacion: this.convertTimestamp(data.fechaCreacion),
-            fechaModificacion: this.convertTimestamp(data.fechaModificacion)
-          });
-        });
-        this.updateExpenses(expenses);
-        console.log('✅ Datos cargados desde Firestore:', expenses.length, 'gastos');
-      }, (error) => {
-        console.error('❌ Error en Firestore:', error);
-        this.updateExpenses([]);
-      });
-    } catch (error) {
-      console.error('❌ Error al configurar Firestore:', error);
-      this.updateExpenses([]);
-    }
-  }
-
-  /**
-   * 🔥 NUEVO: Convertir Timestamps de Firebase
-   */
-  private convertTimestamp(timestamp: any): string {
-    if (timestamp instanceof Timestamp) {
-      return timestamp.toDate().toISOString();
-    }
-    if (timestamp instanceof Date) {
-      return timestamp.toISOString();
-    }
-    return timestamp || new Date().toISOString();
-  }
-
-  /**
-   * Obtener todos los gastos (sin cambios en la interfaz)
-   */
-  getExpenses(): Expense[] {
-    return this.expenses();
-  }
-
-  /**
-   * Obtener gasto por ID (sin cambios en la interfaz)
-   */
-  getExpenseById(id: string): Expense | undefined {
-    return this.expenses().find(expense => expense.id === id);
-  }
-
-  /**
-   * 🔄 MIGRADO: Agregar nuevo gasto
-   */
-  addExpense(expenseForm: ExpenseForm): Expense {
-    // Crear gasto temporal para UI inmediata
-    const tempExpense: Expense = {
-      id: 'temp-' + Date.now(),
-      ...expenseForm,
-      fechaCreacion: new Date().toISOString(),
-      fechaModificacion: new Date().toISOString()
-    };
-
-    // Guardar en Firestore en segundo plano
-    this.addExpenseToFirestore(expenseForm).catch(error => {
-      console.error('Error al guardar en Firestore:', error);
-    });
-
-    return tempExpense;
-  }
-
-  /**
-   * 🔥 NUEVO: Método privado para Firestore
-   */
-  private async addExpenseToFirestore(expenseForm: ExpenseForm): Promise<Expense> {
-    try {
-      console.log('📝 Agregando gasto a Firestore...', expenseForm);
-      
-      const expenseData: ExpenseData = {
-        ...expenseForm,
-        fechaCreacion: Timestamp.now(),
-        fechaModificacion: Timestamp.now()
-      };
-
-      const expensesCollection = collection(this.firestore, this.COLLECTION_NAME);
-      const docRef = await addDoc(expensesCollection, expenseData);
-      
-      console.log('✅ Gasto agregado con ID:', docRef.id);
-      
-      return {
-        id: docRef.id,
-        ...expenseForm,
-        fechaCreacion: new Date().toISOString(),
-        fechaModificacion: new Date().toISOString()
-      };
-    } catch (error: any) {
-      console.error('❌ Error al agregar gasto:', error);
-      if (error.code === 'permission-denied') {
-        console.error('🔒 Verifica las reglas de Firestore');
-      }
-      throw error;
-    }
-  }
-
-  /**
-   * 🔄 MIGRADO: Actualizar gasto
-   */
-  updateExpense(id: string, expenseForm: ExpenseForm): Expense | null {
-    const currentExpense = this.getExpenseById(id);
-    if (!currentExpense) return null;
-
-    const updatedExpense: Expense = {
-      ...currentExpense,
-      ...expenseForm,
-      fechaModificacion: new Date().toISOString()
-    };
-
-    // Actualizar en Firestore en segundo plano
-    this.updateExpenseInFirestore(id, expenseForm).catch(error => {
-      console.error('Error al actualizar en Firestore:', error);
-    });
-
-    return updatedExpense;
-  }
-
-  /**
-   * 🔥 NUEVO: Método privado para actualizar en Firestore
-   */
-  private async updateExpenseInFirestore(id: string, expenseForm: ExpenseForm): Promise<void> {
-    try {
-      const expenseDoc = doc(this.firestore, this.COLLECTION_NAME, id);
-      const updateData: Partial<ExpenseData> = {
-        ...expenseForm,
-        fechaModificacion: Timestamp.now()
-      };
-      await updateDoc(expenseDoc, updateData);
-      console.log('✅ Gasto actualizado:', id);
-    } catch (error) {
-      console.error('❌ Error al actualizar gasto:', error);
-    }
-  }
-
-  /**
-   * 🔄 MIGRADO: Eliminar gasto
-   */
-  deleteExpense(id: string): boolean {
-    // Eliminar de Firestore en segundo plano
-    this.deleteExpenseFromFirestore(id).catch(error => {
-      console.error('Error al eliminar en Firestore:', error);
-    });
-    return true;
-  }
-
-  /**
-   * 🔥 NUEVO: Método privado para eliminar de Firestore
-   */
-  private async deleteExpenseFromFirestore(id: string): Promise<void> {
-    try {
-      const expenseDoc = doc(this.firestore, this.COLLECTION_NAME, id);
-      await deleteDoc(expenseDoc);
-      console.log('✅ Gasto eliminado:', id);
-    } catch (error) {
-      console.error('❌ Error al eliminar gasto:', error);
-    }
-  }
-
-  /**
-   * Calcular total (sin cambios)
-   */
-  getTotalAmount(): number {
-    return this.expenses().reduce((total, expense) => total + expense.monto, 0);
-  }
-
-  /**
-   * Actualizar estado interno (método privado)
-   */
-  private updateExpenses(expenses: Expense[]): void {
-    this.expenses.set(expenses);
-    this.expensesSubject.next(expenses);
-  }
+  // ❌ ELIMINADO: loadExpenses() y saveToStorage()
+  // ✅ AGREGADO: setupRealtimeListener() con onSnapshot()
+  // ✅ AGREGADO: Métodos privados para CRUD en Firestore
+  // ✅ MANTENIDO: Misma interfaz pública (getExpenses, addExpense, etc.)
 }
 ```
 
@@ -466,4 +283,25 @@ service cloud.firestore {
 3. **💾 Backup automático**: Firebase maneja las copias de seguridad
 4. **📱 Escalabilidad**: Soporta múltiples usuarios
 5. **🔒 Seguridad**: Reglas de acceso configurables
+
+---
+
+## 👨‍💻 Sobre el Autor
+
+**Sergie Code** es un Software Engineer especializado en Frontend y actualmente se desempeña como Tech Lead liderando dos equipos de desarrolladores en una reconocida empresa americana de seguros. Además, es creador de contenido tecnológico y educativo, ofreciendo cursos gratuitos de programación en su canal de YouTube y compartiendo a diario en Instagram, TikTok y otras redes sociales tips, recomendaciones y novedades del mundo del desarrollo y la inteligencia artificial. 
+
+Ha dictado clases en la UTN, en los programas Codo a Codo y Argentina Programa 4.0, y también ha desarrollado e impartido cursos de HTML, CSS, JavaScript y ReactJs en la carrera Certified Tech Developer de Digital House. En el marco de su colaboración con Platzi, recientemente filmó en Bogotá, Colombia, tres cursos para la nueva etapa de contenidos 2025/2026: **Fundamentos de Python**, **Firebase con Angular y Gemini** y **Monorepo NX con Angular y NodeJS**. 
+
+Asimismo, lanzó cursos propios en el área de Data, como Introducción a Python y Programación en Python, donde enseña esta tecnología desde cero. Su formación incluye estudios en Ingeniería Electrónica en la UNC, la certificación como Java Developer Engineer en Educación IT y una extensa capacitación en frameworks y tecnologías a través de cursos online. Además de su perfil técnico, se ha desarrollado como músico independiente, lo que potenció su creatividad y habilidades comunicacionales. Gracias a su experiencia, posee destacadas soft skills, comodidad al hablar en público y ha participado como orador en eventos multitudinarios como ADA13, Fingurú y SAIA en la UTN.
+
+### 🌐 Conecta con Sergie Code
+
+- 📸 **Instagram**: https://www.instagram.com/sergiecode
+- 🧑🏼‍💻 **LinkedIn**: https://www.linkedin.com/in/sergiecode/
+- 📽️ **YouTube**: https://www.youtube.com/@SergieCode
+- 😺 **GitHub**: https://github.com/sergiecode
+- 👤 **Facebook**: https://www.facebook.com/sergiecodeok
+- 🎞️ **TikTok**: https://www.tiktok.com/@sergiecode
+- 🕊️ **Twitter**: https://twitter.com/sergiecode
+- 🧵 **Threads**: https://www.threads.net/@sergiecode
 
