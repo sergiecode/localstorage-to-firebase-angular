@@ -1,11 +1,23 @@
+import { Timestamp } from '@angular/fire/firestore';
+
 export interface Expense {
   id: string;
   nombre: string;
   categoria: string;
   fijo: boolean;
   monto: number;
-  fechaCreacion?: Date | string; // Firebase compatible timestamp
-  fechaModificacion?: Date | string; // Firebase compatible timestamp
+  fechaCreacion?: Timestamp | Date | string; // Firebase compatible timestamp
+  fechaModificacion?: Timestamp | Date | string; // Firebase compatible timestamp
+}
+
+// Interface for Firestore document data (without id)
+export interface ExpenseData {
+  nombre: string;
+  categoria: string;
+  fijo: boolean;
+  monto: number;
+  fechaCreacion?: Timestamp | Date | string;
+  fechaModificacion?: Timestamp | Date | string;
 }
 
 export interface ExpenseForm {
