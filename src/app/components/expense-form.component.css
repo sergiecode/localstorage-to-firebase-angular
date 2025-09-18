@@ -45,12 +45,18 @@ input.error, select.error {
   border-color: #dc3545;
 }
 
+.checkbox-group {
+  display: flex;
+}
+
 .checkbox-group label {
+  display: flex;
   flex-direction: row;
   align-items: center;
   gap: 0.5rem;
   font-weight: normal;
   margin-bottom: 0;
+  cursor: pointer;
 }
 
 .checkbox-label {
@@ -60,6 +66,7 @@ input.error, select.error {
 input[type="checkbox"] {
   width: auto;
   margin: 0;
+  flex-shrink: 0;
 }
 
 .error-message {
@@ -113,11 +120,16 @@ input[type="checkbox"] {
       "nombre categoria"
       "monto fijo"
       "actions actions";
+    align-items: start;
   }
 
   .form-group:nth-child(1) { grid-area: nombre; }
   .form-group:nth-child(2) { grid-area: categoria; }
-  .form-group:nth-child(3) { grid-area: fijo; }
+  .form-group:nth-child(3) { 
+    grid-area: fijo; 
+    align-self: end;
+    padding-bottom: 0.75rem;
+  }
   .form-group:nth-child(4) { grid-area: monto; }
   .form-actions { grid-area: actions; }
 }
