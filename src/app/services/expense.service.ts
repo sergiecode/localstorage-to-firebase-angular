@@ -1,17 +1,17 @@
 import { Injectable, signal } from '@angular/core';
 import { 
-  Firestore, 
-  collection, 
-  doc, 
-  addDoc, 
-  updateDoc, 
-  deleteDoc, 
-  query, 
-  orderBy,
-  Timestamp,
-  onSnapshot,
-  QuerySnapshot,
-  DocumentData
+  Firestore,       // Instancia principal de la base de datos Firestore
+  collection,      // Crea referencia a una colección de documentos
+  doc,            // Crea referencia a un documento específico por ID
+  addDoc,         // Agrega un nuevo documento con ID auto-generado
+  updateDoc,      // Actualiza campos específicos de un documento existente
+  deleteDoc,      // Elimina permanentemente un documento
+  query,          // Crea consultas con filtros y ordenamiento
+  orderBy,        // Ordena resultados por un campo específico
+  Timestamp,      // Tipo de datos para fechas/horas de Firebase
+  onSnapshot,     // Escucha cambios en tiempo real en documentos/colecciones
+  QuerySnapshot,  // Tipo para el resultado de consultas con múltiples documentos
+  DocumentData    // Tipo genérico para datos de documentos de Firestore
 } from '@angular/fire/firestore';
 import { Expense, ExpenseForm, ExpenseData } from '../models/expense.model';
 
